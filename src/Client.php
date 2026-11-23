@@ -97,11 +97,11 @@ class Client
     }
 
     /**
-     * 批量并发请求
+     * 批量并发请求（单项失败不中断，全部返回）
      *
      * @param array<int|string, array{class?:mixed,method?:string,arguments?:array,options?:array}> $arr
-     * @return array
-     * @throws ConcurrencyException
+     * @return array<string, array{success:bool,data?:string,message?:string}>
+     * @throws ConcurrencyException 仅参数校验失败时抛出
      */
     public function requestArray(array $arr): array
     {
@@ -127,33 +127,49 @@ class Client
         foreach ($arr as $key => $value) {
             $base = $this->nextAddress();
             $parallel->add(static function () use ($base, $path, $value, $connection) {
-                $response = self::$http->request($base . $path, [
-                    'method'  => 'GET',
-                    'version' => '1.1',
-                    'headers' => ['Connection' => $connection],
-                    'data'    => $value,
-                ]);
-                return (string) $response->getBody();
+                try {
+                    $response = self::$http->request($base . $path, [
+                        'method'  => 'GET',
+                        'version' => '1.1',
+                        'headers' => ['Connection' => $connection],
+                        'data'    => $value,
+                    ]);
+                    return [
+                        'code' => $response->getStatusCode(),
+                        'success' => true,
+                        'data'    => (string) $response->getBody(),
+                    ];
+                } catch (\Throwable $e) {
+                    return [
+                        'code' => $e->getCode(),
+                        'success' => false,
+                        'message' => $e->getMessage(),
+                    ];
+                }
             }, (string) $key);
         }
 
         $result = $parallel->wait();
-        $exceptions = $parallel->getExceptions();
-        if ($exceptions) {
-            $first = reset($exceptions);
-            throw new ConcurrencyException('并发请求失败：' . $first->getMessage(), (int) $first->getCode(), $first);
+        // Parallel 兜底：未在闭包内捕获的异常也并入结果，不中断整批
+        foreach ($parallel->getExceptions() as $key => $e) {
+            $result[$key] = [
+                'code' => $e->getCode(),
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
         }
         return $result;
     }
 
     /**
-     * 单次请求
+     * 单次请求（失败时仍返回结构，不抛异常）
      *
      * @param array{class:mixed,method:string,arguments?:array,options?:array} $payload
+     * @return array{success:bool,data?:string,message?:string}
      */
-    public function request(array $payload): string
+    public function request(array $payload): array
     {
         $results = $this->requestArray([$payload]);
-        return (string) reset($results);
+        return (array) reset($results);
     }
 }
