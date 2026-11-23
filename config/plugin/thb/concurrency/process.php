@@ -2,10 +2,9 @@
 
 use support\Log;
 use support\Request;
-use Webman\App;
+use app\process\Http;
 
-$appFile = __DIR__ . '/app.php';
-$app = is_file($appFile) ? include $appFile : [];
+$app = config('plugin.thb.concurrency.app', []);
 
 if (empty($app['enable'])) {
     return [];
@@ -22,7 +21,7 @@ $processes = [];
 for ($i = 1; $i <= $listenCount; $i++) {
     $port = $basePort + $i;
     $processes['worker' . $i] = [
-        'handler' => App::class,
+        'handler' => Http::class,
         'listen' => 'http://' . $host . ':' . $port,
         'count' => $workerCount,
         'reusePort' => $reusePort,
