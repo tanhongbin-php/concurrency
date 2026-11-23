@@ -1,0 +1,17 @@
+{
+  "name": "thb/concurrency",
+  "type": "library",
+  "license": "MIT",
+  "description": "Webman plugin: multi-port HTTP concurrency workers with round-robin client",
+  "keywords": ["webman", "concurrency", "workerman", "http-client"],
+  "require": {
+    "php": ">=8.1",
+    "workerman/http-client": "^3.0",
+    "workerman/coroutine": ">=1.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Thb\\Concurrency\\": "src"
+    }
+  }
+}
